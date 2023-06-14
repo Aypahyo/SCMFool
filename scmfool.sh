@@ -14,7 +14,8 @@ setup() {
     #this allows the inter to think the call could be legitimate
     #downstream it removes a bunch of warnings about unreachable code
     SCMFOOL_LINTER_NOT_HAPPY=${SCMFOOL_LINTER_NOT_HAPPY:-"false"}
-    if SCMFOOL_LINTER_NOT_HAPPY=true; then
+    # if SCMFOOL_LINTER_NOT_HAPPY is true, then call the linter_rechability_ignorer function
+    if [[ $SCMFOOL_LINTER_NOT_HAPPY == true ]]; then
         linter_rechability_ignorer "foo"
     fi
 }
@@ -58,14 +59,12 @@ linter_rechability_ignorer() {
     # This function is used to ignore unreachable code warnings from the linter
     # It is used to ignore the linter warning about "Command appears to be unreachable" SC2317
     # The functions are reachable through an array, but the linter doesn't know that, so here they are added to allow the linter to ignore them
-    # shellcheck disable=SC2317
-    is_git "$@"
-    # shellcheck disable=SC2317
-    git_pull "$@"
-    # shellcheck disable=SC2317
-    is_svn "$@"
-    # shellcheck disable=SC2317
-    svn_update "$@"
+    if is_git "$1"; then
+        git_pull "$1"
+    fi
+    if is_svn "$1"; then
+        svn_update "$1"
+    fi
 }
 
 is_git() {

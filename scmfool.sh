@@ -83,41 +83,44 @@ is_svn() {
 git_pull() {
     local item=$1
     echo "Processing git repository: ${item}" >> "${SCMFOOL_TEMP}/pull.log"
-    pushd "${item}" || return 1
+    pushd "${item}" 1>/dev/null 2>&1 || return 1
+    pwd
     if ! git pull >> "${SCMFOOL_TEMP}/pull.log" 2>&1; then
         echo "Failed to update repository: ${item}" >&2
         echo "Failed to update repository: ${item}" >> "${SCMFOOL_TEMP}/pull.log"
-        popd || return 1
+        popd 1>/dev/null 2>&1 || return 1
         return 1
     fi
-    popd || return 1
+    popd 1>/dev/null 2>&1 || return 1
 }
 
 svn_update() {
     local item=$1
     echo "Processing svn repository: ${item}" >> "${SCMFOOL_TEMP}/pull.log"
-    pushd "${item}" || return 1
+    pushd 1>/dev/null 2>&1 "${item}" || return 1
+    pwd
     if ! svn update >> "${SCMFOOL_TEMP}/pull.log" 2>&1; then
         echo "Failed to update repository: ${item}" >&2
         echo "Failed to update repository: ${item}" >> "${SCMFOOL_TEMP}/pull.log"
-        popd || return 1
+        popd 1>/dev/null 2>&1 || return 1
         return 1
     fi
-    popd || return 1
+    popd 1>/dev/null 2>&1 || return 1
 }
 
 git_status() {
     local item=$1
     echo "Processing git repository: ${item}" >> "${SCMFOOL_TEMP}/status.log"
-    pushd "${item}" || return 1
+    pushd "${item}" 1>/dev/null 2>&1 || return 1
+    pwd
     git_status_output=$(git status)
     echo "$git_status_output" >> "${SCMFOOL_TEMP}/status.log"
     if echo "$git_status_output" | grep -q 'Your branch is up to date'; then
-        popd || return 1
+        popd 1>/dev/null 2>&1 || return 1
     else
         echo "Repository not up to date: ${item}"
         echo "$git_status_output"
-        popd || return 1
+        popd 1>/dev/null 2>&1 || return 1
         return 1
     fi
 }
@@ -125,19 +128,19 @@ git_status() {
 svn_status() {
     local item=$1
     echo "Processing svn repository: ${item}" >> "${SCMFOOL_TEMP}/status.log"
-    pushd "${item}" || return 1
+    pushd 1>/dev/null 2>&1 "${item}" || return 1
+    pwd
     svn_status_output=$(svn status)
     echo "$svn_status_output" >> "${SCMFOOL_TEMP}/status.log"
     if [ -z "$svn_status_output" ]; then
-        popd || return 1
+        popd 1>/dev/null 2>&1 || return 1
     else
         echo "Repository not up to date: ${item}"
         echo "$svn_status_output"
-        popd || return 1
+        popd 1>/dev/null 2>&1 || return 1
         return 1
     fi
 }
-
 
 execute_scm_action() {
     local dir_path=$1

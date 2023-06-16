@@ -110,12 +110,15 @@ svn_update() {
 
 git_status() {
     local item=$1
+    local line_count=0
     echo "Processing git repository: ${item}" >> "${SCMFOOL_TEMP}/status.log"
     pushd "${item}" 1>/dev/null 2>&1 || return 1
     pwd
     git_status_output=$(git status)
+    line_count=$(echo "$git_status_output" | wc -l)
     echo "$git_status_output" >> "${SCMFOOL_TEMP}/status.log"
-    if echo "$git_status_output" | grep -q 'Your branch is up to date'; then
+    # if the line count is less than 5 and the last line contains "nothing to commit, working tree clean" then the repository is up to date
+    if [ "$line_count" -lt 5 ] && echo "$git_status_output" | grep -q 'nothing to commit, working tree clean'; then
         popd 1>/dev/null 2>&1 || return 1
     else
         echo "Repository not up to date: ${item}"

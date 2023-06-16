@@ -24,6 +24,14 @@ Reach out on twitter if you need anything or just want to say hi.
 The selftest checks if all required tools are installed.
 The exit code is 0 if all tests are passed, otherwise 1.
 
+### commands
+
+All commands recusively search for repos in the root directory.
+The root directory is defined by the environment variable SCMFOOL_ROOT.
+The first hit is the repo, so nested repos are not supported.
+A hit is when an internal check for supported repos is successful.
+A mapped repo specific command is executed for each hit.
+
 ### pull
 
 ```bash
@@ -35,8 +43,18 @@ The exit code is 0 if all repos are up to date, otherwise 1.
 In case of an error, the report will contain the error message.
 Erronious repos will be written to stderr, that does not include folders that are not a repo.
 
-The directory is inspected recusively for repos.
-The first hit is the repo, so nested repos are not supported.
+### status
+
+```bash
+./scmfool.sh status
+```
+
+status will write a full report into status.log.
+The exit code is 0 if all repos are up to date, otherwise 1.
+In case of an error, the report will contain the error message.
+Erronious repos will be written to stderr, that does not include folders that are not a repo.
+If a repo is not up to date, the report will contain the status of the repo.
+If a repo is not up to date, stdout will contain the name of the repo and the status of the repo.
 
 ## development
 

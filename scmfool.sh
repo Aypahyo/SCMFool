@@ -9,6 +9,7 @@ setup() {
     SCMFOOL_TEMP=${SCMFOOL_TEMP:-"$(realpath "$(dirname "$0")/tmp")"}
     mkdir -p "$SCMFOOL_TEMP"
     rm -f "${SCMFOOL_TEMP}/pull.log"
+    rm -f "${SCMFOOL_TEMP}/status.log"
 
     #do not actually set SCM_FOOLF_LINTER_NOT_HAPPY to true.
     #this allows the inter to think the call could be legitimate
@@ -61,9 +62,11 @@ linter_rechability_ignorer() {
     # The functions are reachable through an array, but the linter doesn't know that, so here they are added to allow the linter to ignore them
     if is_git "$1"; then
         git_pull "$1"
+        git_status "$1"
     fi
     if is_svn "$1"; then
         svn_update "$1"
+        svn_status "$1"
     fi
 }
 
@@ -84,6 +87,7 @@ git_pull() {
     if ! git pull >> "${SCMFOOL_TEMP}/pull.log" 2>&1; then
         echo "Failed to update repository: ${item}" >&2
         echo "Failed to update repository: ${item}" >> "${SCMFOOL_TEMP}/pull.log"
+        popd || return 1
         return 1
     fi
     popd || return 1
@@ -96,10 +100,44 @@ svn_update() {
     if ! svn update >> "${SCMFOOL_TEMP}/pull.log" 2>&1; then
         echo "Failed to update repository: ${item}" >&2
         echo "Failed to update repository: ${item}" >> "${SCMFOOL_TEMP}/pull.log"
+        popd || return 1
         return 1
     fi
     popd || return 1
 }
+
+git_status() {
+    local item=$1
+    echo "Processing git repository: ${item}" >> "${SCMFOOL_TEMP}/status.log"
+    pushd "${item}" || return 1
+    git_status_output=$(git status)
+    echo "$git_status_output" >> "${SCMFOOL_TEMP}/status.log"
+    if echo "$git_status_output" | grep -q 'Your branch is up to date'; then
+        popd || return 1
+    else
+        echo "Repository not up to date: ${item}"
+        echo "$git_status_output"
+        popd || return 1
+        return 1
+    fi
+}
+
+svn_status() {
+    local item=$1
+    echo "Processing svn repository: ${item}" >> "${SCMFOOL_TEMP}/status.log"
+    pushd "${item}" || return 1
+    svn_status_output=$(svn status)
+    echo "$svn_status_output" >> "${SCMFOOL_TEMP}/status.log"
+    if [ -z "$svn_status_output" ]; then
+        popd || return 1
+    else
+        echo "Repository not up to date: ${item}"
+        echo "$svn_status_output"
+        popd || return 1
+        return 1
+    fi
+}
+
 
 execute_scm_action() {
     local dir_path=$1
@@ -158,7 +196,8 @@ execute_scm_action() {
 }
 
 is_functions=(is_git is_svn)
-action_functions=(git_pull svn_update)
+pull_functions=(git_pull svn_update)
+status_functions=(git_status svn_status)
 
 main() {
     setup
@@ -171,7 +210,11 @@ main() {
         exit_status=$? # capture the return value
         ;;
     "pull")
-        execute_scm_action "$SCMFOOL_ROOT" "${is_functions[*]}" "${action_functions[*]}"
+        execute_scm_action "$SCMFOOL_ROOT" "${is_functions[*]}" "${pull_functions[*]}"
+        exit_status=$? # capture the return value
+        ;;
+    "status")
+        execute_scm_action "$SCMFOOL_ROOT" "${is_functions[*]}" "${status_functions[*]}"
         exit_status=$? # capture the return value
         ;;
     *)

@@ -80,6 +80,19 @@ is_svn() {
     [ -d "${1}/.svn" ]
 }
 
+open_repo_needs_attention() {
+    local item=$1
+    if command -v code > /dev/null 2>&1; then
+        if code "$item" > /dev/null 2>&1; then
+            echo "Opened in VS Code: ${item}"
+        else
+            echo "Failed to open in VS Code: ${item}" >&2
+        fi
+    else
+        echo "Repository not clean: ${item}"
+    fi
+}
+
 git_pull() {
     local item=$1
     echo "Processing git repository: ${item}" >> "${SCMFOOL_TEMP}/pull.log"
@@ -110,18 +123,45 @@ svn_update() {
 
 git_status() {
     local item=$1
-    local line_count=0
+    local exit_status=0
+    local git_status_output
+    local git_status_short
     echo "Processing git repository: ${item}" >> "${SCMFOOL_TEMP}/status.log"
     pushd "${item}" 1>/dev/null 2>&1 || return 1
-    pwd
-    git_status_output=$(git status)
-    line_count=$(echo "$git_status_output" | wc -l)
+
+    if [ -n "$(git remote)" ]; then
+        echo "Fetching git repository: ${item}" >> "${SCMFOOL_TEMP}/status.log"
+        if ! git fetch --all --prune >> "${SCMFOOL_TEMP}/status.log" 2>&1; then
+            echo "Failed to fetch repository: ${item}" >&2
+            echo "Failed to fetch repository: ${item}" >> "${SCMFOOL_TEMP}/status.log"
+            exit_status=1
+        fi
+    fi
+
+    if ! git_status_output=$(git status 2>&1); then
+        echo "$git_status_output" >> "${SCMFOOL_TEMP}/status.log"
+        open_repo_needs_attention "$item"
+        echo "$git_status_output"
+        popd 1>/dev/null 2>&1 || return 1
+        return 1
+    fi
+
+    if ! git_status_short=$(git status --short --branch 2>&1); then
+        echo "$git_status_short" >> "${SCMFOOL_TEMP}/status.log"
+        open_repo_needs_attention "$item"
+        echo "$git_status_short"
+        popd 1>/dev/null 2>&1 || return 1
+        return 1
+    fi
+
     echo "$git_status_output" >> "${SCMFOOL_TEMP}/status.log"
-    # if the line count is less than 5 and the last line contains "nothing to commit, working tree clean" then the repository is up to date
-    if [ "$line_count" -lt 5 ] && echo "$git_status_output" | grep -q 'nothing to commit, working tree clean'; then
+
+    if [ "$exit_status" -eq 0 ] &&
+        [ "$(echo "$git_status_short" | wc -l)" -eq 1 ] &&
+        ! echo "$git_status_short" | grep -Eq '\[(ahead|behind|gone)( |])'; then
         popd 1>/dev/null 2>&1 || return 1
     else
-        echo "Repository not up to date: ${item}"
+        open_repo_needs_attention "$item"
         echo "$git_status_output"
         popd 1>/dev/null 2>&1 || return 1
         return 1
@@ -130,15 +170,22 @@ git_status() {
 
 svn_status() {
     local item=$1
+    local svn_status_output
     echo "Processing svn repository: ${item}" >> "${SCMFOOL_TEMP}/status.log"
     pushd 1>/dev/null 2>&1 "${item}" || return 1
-    pwd
-    svn_status_output=$(svn status)
+    if ! svn_status_output=$(svn status -u 2>&1); then
+        echo "$svn_status_output" >> "${SCMFOOL_TEMP}/status.log"
+        open_repo_needs_attention "$item"
+        echo "$svn_status_output"
+        popd 1>/dev/null 2>&1 || return 1
+        return 1
+    fi
+
     echo "$svn_status_output" >> "${SCMFOOL_TEMP}/status.log"
-    if [ -z "$svn_status_output" ]; then
+    if ! echo "$svn_status_output" | grep -Eqv '^(Status against revision:|$)'; then
         popd 1>/dev/null 2>&1 || return 1
     else
-        echo "Repository not up to date: ${item}"
+        open_repo_needs_attention "$item"
         echo "$svn_status_output"
         popd 1>/dev/null 2>&1 || return 1
         return 1
